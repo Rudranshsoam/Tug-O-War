@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tug of War — Red vs Blue</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--blue:#2588ff;--navy:#102342;--sky:#cdeaff}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;min-height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#eaf4ff;color:var(--navy)}
+body{min-height:100svh;display:grid;place-items:center;padding:14px;overflow-x:hidden}
+button{font:inherit;touch-action:manipulation;cursor:pointer}
+.shell{width:min(100%,980px);min-height:min(720px,calc(100svh - 28px));background:#fff;border-radius:28px;overflow:hidden;box-shadow:0 22px 65px #173b6526;position:relative}
+.intro{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;background:radial-gradient(circle at 50% 35%,#fff 0,#eff7ff 55%,#dceeff 100%);transition:opacity .45s,visibility .45s}
+.intro.hide{opacity:0;visibility:hidden;pointer-events:none}
+.intro-mark{font-size:clamp(54px,10vw,86px);line-height:1;margin-bottom:18px;animation:bob 2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-9px)}}
+.intro h1{font-size:clamp(34px,7vw,64px);line-height:1.03;letter-spacing:-2px;margin:0;color:#142b4e}
+.intro h1 span{color:var(--blue)}
+.intro p{font-size:clamp(15px,2.5vw,19px);color:#63748d;margin:17px 0 22px;max-width:440px;line-height:1.55;animation:appear .9s both}
+.room-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;width:min(100%,460px)}.room-actions button{border:0;border-radius:14px;padding:13px 19px;font-weight:900;font-size:15px}.create{background:linear-gradient(135deg,#399cff,#176be5);color:#fff;box-shadow:0 8px 20px #2588ff40}.join{background:#fff;color:#176fe8;border:2px solid #b9d9ff!important}.passplay{background:#2ed573;color:#fff;box-shadow:0 8px 20px rgba(46,213,115,0.4)}
+.setting{display:flex;align-items:center;gap:10px;margin:0 0 16px;color:#536985;font-weight:800}.setting select{border:1px solid #cddced;border-radius:10px;padding:9px 12px;background:#fff;color:#17365b;font-weight:800}
+.room-panel{display:none;position:absolute;inset:0;z-index:8;background:#102342b8;place-items:center;padding:18px}.room-panel.show{display:grid}.room-box{background:#fff;border-radius:22px;padding:24px;width:min(390px,100%);text-align:center;box-shadow:0 20px 60px #10234255}.room-box h3{margin:0 0 8px;font-size:25px}.room-box p{color:#63748d;line-height:1.45;margin:8px 0 15px}.room-code{font-size:30px;letter-spacing:5px;font-weight:1000;color:#176fe8;background:#eef6ff;border:1px dashed #9ac8ff;border-radius:12px;padding:12px;margin:12px 0}.room-box input{width:100%;padding:13px;border:1px solid #cbd9e9;border-radius:11px;font-size:20px;text-align:center;text-transform:uppercase;letter-spacing:3px;font-weight:900}.room-box button{border:0;border-radius:11px;padding:12px 18px;font-weight:900;margin:5px}.room-primary{background:#176fe8;color:white}.room-secondary{background:#edf3fa;color:#435a76}.room-status{font-weight:800;color:#176fe8;min-height:24px}
+.connection{font-size:11px;font-weight:850;color:#71819a;background:#f0f5fb;border-radius:20px;padding:7px 10px}
+.scores{display:flex;justify-content:center;gap:22px;font-weight:950;font-size:14px;color:#435a76}.scores b{color:#152f52}
+.requested{color:#15945a;font-weight:1000;margin-left:4px}
+.again:disabled{opacity:.5;cursor:wait}
+.menu-secondary-btn{border:0;border-radius:10px;padding:10px 16px;background:#e8f0fe;color:#176fe8;font-weight:900;font-size:14px}
+@keyframes appear{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.game{padding:clamp(14px,3vw,28px);display:flex;flex-direction:column;min-height:min(720px,calc(100svh - 28px));gap:14px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.top h2{margin:0;font-size:clamp(21px,4vw,30px);letter-spacing:-1px}
+.top small{color:#71819a;font-weight:700}
+.top-btns{display:flex;align-items:center;gap:6px}
+.reset,.home-btn{border:1px solid #dce7f4;background:#f4f8fd;border-radius:12px;padding:8px 12px;color:#405571;font-weight:800;font-size:13px}
+.arena{position:relative;overflow:hidden;border-radius:22px;background:#cceaff;border:1px solid #d5e8f8;flex:1;min-height:260px;display:flex;align-items:stretch}
+canvas{width:100%;height:100%;min-height:260px;display:block}
+.message{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:#ffffffdf;border:1px solid #fff;border-radius:99px;padding:8px 16px;font-weight:850;font-size:clamp(12px,2vw,15px);white-space:nowrap;box-shadow:0 5px 15px #25496a18}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.player{border-radius:18px;padding:14px;background:#f8fbff;border:1px solid #e1eaf5;display:flex;flex-direction:column;gap:10px}
+.player.red{border-bottom:5px solid #ff4d55}.player.blue{border-bottom:5px solid var(--blue)}
+.player-head{display:flex;align-items:center;justify-content:space-between;font-weight:900}
+.name{display:flex;align-items:center;gap:9px}.dot{width:15px;height:15px;border-radius:50%;background:#ff4d55;border:2px solid #ff4d55;box-shadow:0 0 0 4px #ffe5e7}.blue .dot{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 4px #e3f1ff}
+.key{font-size:11px;color:#72819a;background:#edf2f8;border-radius:7px;padding:4px 7px}
+.pull{border:0;border-radius:13px;padding:13px 12px;font-weight:950;font-size:16px;color:#243a58;background:#e8eef6;min-height:52px}
+.red .pull{background:linear-gradient(135deg,#ff777d,#e53b48);color:white;box-shadow:0 6px 14px #ff4d5535}.blue .pull{background:linear-gradient(135deg,#3b9dff,#176fe8);color:white;box-shadow:0 6px 14px #2588ff35}
+.pull:active{transform:scale(.98)}
+.hint{text-align:center;color:#8190a5;font-size:12px;font-weight:650}
+.winner{position:absolute;inset:0;background:#102342a8;display:none;place-items:center;padding:18px}
+.winner.show{display:grid}
+.winbox{background:#fff;border-radius:22px;padding:25px;text-align:center;width:min(360px,100%);box-shadow:0 20px 55px #10234255}
+.winbox .trophy{font-size:42px}.winbox h3{font-size:27px;margin:8px 0}.winbox p{color:#687a92;margin:0 0 18px}
+.again{border:0;border-radius:12px;padding:12px 20px;background:#176fe8;color:#fff;font-weight:900}
+@media(max-width:560px){body{padding:0;background:#fff}.shell{min-height:100svh;border-radius:0}.game{min-height:100svh;padding:14px;gap:11px}.arena{min-height:34svh}.controls{gap:8px}.player{padding:10px}.pull{font-size:14px;padding:12px 5px}.hint{font-size:10px}.top small{font-size:11px}.message{top:9px;padding:7px 12px}.connection{display:none}}
+.guest-mode #redPull{opacity:.35;pointer-events:none}.host-mode #bluePull{opacity:.35;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="shell">
+  <section class="intro" id="intro">
+    <div class="intro-mark">🤝</div>
+    <h1>READY… <span>SET…</span></h1>
+    <p>Play online or locally with a friend on the same screen!</p>
+    <label class="setting">Points to win <select id="targetPoints"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>7</option><option>10</option></select></label>
+    <div class="room-actions">
+      <button class="passplay" id="passPlayBtn">PASS & PLAY</button>
+      <button class="create" id="createRoom">CREATE ROOM</button>
+      <button class="join" id="joinRoom">JOIN ROOM</button>
+    </div>
+    <div class="room-status" id="homeStatus" style="margin-top:13px"></div>
+  </section>
+
+  <main class="game">
+    <div class="top">
+      <div><h2>Tug of War</h2><small id="matchSub">RED vs BLUE</small></div>
+      <div class="top-btns">
+        <span class="connection" id="connection">OFFLINE</span>
+        <button class="reset" id="reset">↻ Restart</button>
+        <button class="home-btn" id="topMenuBtn">⌂ Menu</button>
+      </div>
+    </div>
+    <section class="arena">
+      <canvas id="scene" width="900" height="440"></canvas>
+      <div class="message" id="message">Waiting for players…</div>
+      <div class="winner" id="winner">
+        <div class="winbox">
+          <div class="trophy">🏆</div>
+          <h3 id="winTitle">Blue wins!</h3>
+          <p id="winText">Great pulling!</p>
+          <div id="rematchStatus" style="font-weight:850;color:#52647d;margin:0 0 12px">Red Player · Blue Player</div>
+          <div style="display:flex; gap:10px; justify-content:center;">
+            <button class="again" id="again">REQUEST REMATCH</button>
+            <button class="menu-secondary-btn" id="mainMenuBtn">MAIN MENU</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div class="scores"><span>🔴 RED: <b id="redScore">0</b></span><span>🔵 BLUE: <b id="blueScore">0</b></span><span>FIRST TO <b id="goalScore">3</b></span></div>
+    <section class="controls">
+      <div class="player red">
+        <div class="player-head"><div class="name"><i class="dot"></i> RED PLAYER</div><span class="key">A KEY</span></div>
+        <button class="pull" id="redPull">PULL! ◀</button>
+        <div class="hint">Tap repeatedly to pull left</div>
+      </div>
+      <div class="player blue">
+        <div class="player-head"><div class="name"><i class="dot"></i> BLUE PLAYER</div><span class="key">L KEY</span></div>
+        <button class="pull" id="bluePull">PULL! ▶</button>
+        <div class="hint">Tap repeatedly to pull right</div>
+      </div>
+    </section>
+  </main>
+  <div class="room-panel" id="roomPanel"><div class="room-box"><h3 id="roomTitle">Room created!</h3><p id="roomDescription">Share this code with your friend.</p><div class="room-code" id="roomCodeDisplay">------</div><p class="room-status" id="roomStatus">Waiting for the other player…</p><input id="joinCodeInput" maxlength="6" autocomplete="off" placeholder="6-CHAR CODE" style="display:none"><div><button class="room-primary" id="connectJoin" style="display:none">JOIN</button><button class="room-secondary" id="copyCode">COPY CODE</button><button class="room-secondary" id="closeRoom">CLOSE</button></div></div></div>
+</div>
+<script>
+(()=>{
+const canvas=document.getElementById('scene'),c=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let offset=0,active=false,finished=false,raf=0,peer=null,conn=null,role=null,roomCode='',target=3;
+let redScore=0,blueScore=0,redRematch=false,blueRematch=false,matchOver=false,roundTimer=null,isPassAndPlay=false;
+const limit=300;
+function rounded(x,y,w,h,r,color){c.fillStyle=color;c.beginPath();c.roundRect(x,y,w,h,r);c.fill()}
+function person(x,y,color,outline,flip,lean){c.save();c.translate(x,y);if(flip)c.scale(-1,1);c.lineCap='round';c.lineJoin='round';c.strokeStyle='#263b59';c.lineWidth=12;c.beginPath();c.moveTo(-9,-35);c.lineTo(-18,-4);c.moveTo(9,-35);c.lineTo(18,-4);c.stroke();rounded(-30,-7,27,10,5,'#263b59');rounded(7,-7,27,10,5,'#263b59');c.save();c.translate(0,-57);c.rotate(-.16-lean*.04);rounded(-22,-31,44,57,16,color);if(outline){c.strokeStyle='#8b9db5';c.lineWidth=3;c.strokeRect(-22,-31,44,57)}c.restore();c.fillStyle='#f0c7a8';c.beginPath();c.arc(0,-104,19,0,Math.PI*2);c.fill();c.fillStyle='#38445a';c.beginPath();c.arc(0,-109,19,Math.PI,Math.PI*2);c.fill();c.strokeStyle='#f0c7a8';c.lineWidth=10;c.beginPath();c.moveTo(13,-75);c.lineTo(35,-91);c.stroke();c.fillStyle='#f0c7a8';c.beginPath();c.arc(35,-91,8,0,Math.PI*2);c.fill();c.strokeStyle='#c78e70';c.lineWidth=1.5;c.beginPath();c.arc(35,-91,5,-.8,1.1);c.stroke();c.strokeStyle=color;c.lineWidth=12;c.beginPath();c.moveTo(-14,-74);c.lineTo(-30,-51);c.stroke();c.restore()}
+function draw(){let w=900,h=440;c.clearRect(0,0,w,h);let sky=c.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#bfe4ff');sky.addColorStop(.7,'#e8f6ff');sky.addColorStop(1,'#a9d7a4');c.fillStyle=sky;c.fillRect(0,0,w,h);for(let i=0;i<5;i++){let x=70+i*190,y=75+(i%2)*32;c.fillStyle='#ffffffa8';c.beginPath();c.arc(x,y,21,0,7);c.arc(x+24,y-9,27,0,7);c.arc(x+50,y,20,0,7);c.fill()}c.fillStyle='#9bcf9d';c.beginPath();c.moveTo(0,270);c.quadraticCurveTo(230,195,450,275);c.quadraticCurveTo(690,205,900,270);c.lineTo(900,440);c.lineTo(0,440);c.fill();let grass=c.createLinearGradient(0,300,0,440);grass.addColorStop(0,'#78bd79');grass.addColorStop(1,'#438f62');c.fillStyle=grass;c.fillRect(0,300,900,140);for(let i=0;i<65;i++){let x=(i*97)%900,y=320+(i*31)%110;c.strokeStyle='#ffffff30';c.lineWidth=2;c.beginPath();c.moveTo(x,y);c.lineTo(x-4,y-8);c.stroke()}c.setLineDash([10,10]);c.strokeStyle='#ffffffb0';c.lineWidth=4;c.beginPath();c.moveTo(450,300);c.lineTo(450,425);c.stroke();c.setLineDash([]);let cx=450+offset*.25,ry=274;c.lineCap='round';c.strokeStyle='#86552e';c.lineWidth=13;c.beginPath();c.moveTo(cx-295,ry);c.bezierCurveTo(cx-100,ry+4,cx+100,ry-4,cx+295,ry);c.stroke();c.strokeStyle='#d9ad72';c.lineWidth=3;c.beginPath();c.moveTo(cx-290,ry-3);c.lineTo(cx+290,ry-3);c.stroke();c.fillStyle='#75451f';c.beginPath();c.arc(cx,ry,14,0,7);c.fill();c.strokeStyle='#f2d5a7';c.lineWidth=3;c.beginPath();c.arc(cx,ry,8,0,7);c.stroke();c.strokeStyle='#fff';c.lineWidth=4;c.beginPath();c.moveTo(cx,ry-8);c.lineTo(cx,ry-83);c.stroke();c.fillStyle='#ffcf4a';c.beginPath();c.moveTo(cx,ry-82);c.lineTo(cx+38,ry-69);c.lineTo(cx,ry-56);c.closePath();c.fill();person(120+offset*.25,365,'#ff4d55',false,false,Math.max(0,-offset/80));person(780+offset*.25,365,'#2588ff',false,true,Math.max(0,offset/80));rounded(38+offset*.25,285,150,35,11,'#ffffffed');c.fillStyle='#52647d';c.font='900 16px system-ui';c.fillText('RED PLAYER',53+offset*.25,308);rounded(712+offset*.25,285,150,35,11,'#ffffffed');c.fillStyle='#176fe8';c.fillText('BLUE PLAYER',730+offset*.25,308);rounded(240,405,420,12,6,'#ffffffaa');let marker=450+offset/limit*200;rounded(240,405,Math.max(0,marker-240),12,6,'#ffffff');c.fillStyle='#fff';c.beginPath();c.arc(marker,411,10,0,7);c.fill();c.strokeStyle='#52647d';c.lineWidth=2;c.stroke()}
+function setStatus(t){$('message').textContent=t}
+function updateScores(){ $('redScore').textContent=redScore;$('blueScore').textContent=blueScore;$('goalScore').textContent=target }
+function snapshot(){return {type:'state',offset,active,finished,redScore,blueScore,target,matchOver,redRematch,blueRematch,message:$('message').textContent}}
+function sendState(){if(!isPassAndPlay && role==='host'&&conn&&conn.open)conn.send(snapshot())}
+function applyState(d){offset=d.offset;active=d.active;finished=d.finished;redScore=d.redScore;blueScore=d.blueScore;target=d.target;matchOver=d.matchOver;redRematch=d.redRematch;blueRematch=d.blueRematch;setStatus(d.message||'');updateScores();if(matchOver){$('winner').classList.add('show');$('winTitle').textContent=(redScore>blueScore?'Red':'Blue')+' wins the match!';$('winText').textContent='Final score: Red '+redScore+' — '+blueScore+' Blue';updateRematchUI()}else $('winner').classList.remove('show')}
+function updateRematchUI(){
+  if(isPassAndPlay){
+    $('rematchStatus').textContent='Pass & Play Mode';
+    $('again').textContent='PLAY AGAIN';
+    $('again').disabled=false;
+    return;
+  }
+  const r=redRematch?'✓':'○',b=blueRematch?'✓':'○';
+  $('rematchStatus').textContent='Red Player '+r+'   ·   Blue Player '+b;
+  $('again').textContent=role==='host'?(redRematch?'WAITING FOR BLUE…':'REQUEST REMATCH'):(blueRematch?'WAITING FOR RED…':'REQUEST REMATCH');
+  $('again').disabled=(role==='host'?redRematch:blueRematch);
+}
+function endRound(who){if(finished||!active)return;finished=true;active=false;if(who==='Red')redScore++;else blueScore++;if(redScore>=target||blueScore>=target){matchOver=true;setStatus(who.toUpperCase()+' WINS THE MATCH!');$('winTitle').textContent=who+' wins the match!';$('winText').textContent='Final score: Red '+redScore+' — '+blueScore+' Blue';$('winner').classList.add('show');updateRematchUI()}else{setStatus(who.toUpperCase()+' SCORES A POINT!');$('winTitle').textContent=who+' scores a point!';$('winText').textContent='Next point starts in a moment. First to '+target+' wins.';$('winner').classList.add('show');$('again').textContent='NEXT POINT';$('again').disabled=false}updateScores();sendState();if(!matchOver){clearTimeout(roundTimer);roundTimer=setTimeout(()=>{if((isPassAndPlay||role==='host')&&!matchOver){offset=0;finished=false;active=true;$('winner').classList.remove('show');setStatus('NEXT POINT — PULL!');sendState()}},1800)}}
+function handlePull(side){
+  if(!active||finished)return;
+  offset=Math.max(-limit,Math.min(limit,offset+(side==='red'?-18:18)));
+  if(offset<=-limit)endRound('Red');
+  else if(offset>=limit)endRound('Blue');
+  else {
+    if(!isPassAndPlay && role==='guest' && conn && conn.open) {
+      conn.send({type:'pull',side:'blue'});
+    }
+    sendState();
+  }
+}
+function localPull(side){
+  if(!active||finished)return;
+  if(isPassAndPlay){
+    handlePull(side);
+  } else if(role==='host'&&side==='red'){
+    handlePull('red');
+  } else if(role==='guest'&&side==='blue'){
+    handlePull('blue');
+  }
+}
+function startPassAndPlay(){
+  clearTimeout(roundTimer);
+  isPassAndPlay=true;
+  role=null;
+  document.body.classList.remove('host-mode','guest-mode');
+  target=Number($('targetPoints').value)||3;
+  redScore=0; blueScore=0; redRematch=false; blueRematch=false;
+  offset=0; finished=false; matchOver=false; active=true;
+  $('winner').classList.remove('show');
+  $('intro').classList.add('hide');
+  $('connection').textContent='PASS & PLAY';
+  $('matchSub').textContent='LOCAL 2-PLAYER';
+  updateScores();
+  setStatus('PULL! PULL! PULL!');
+}
+function returnToMainMenu(){
+  clearTimeout(roundTimer);
+  active=false;
+  finished=false;
+  matchOver=false;
+  isPassAndPlay=false;
+  role=null;
+  offset=0;
+  document.body.classList.remove('host-mode','guest-mode');
+  if(conn){conn.close(); conn=null;}
+  if(peer){peer.destroy(); peer=null;}
+  $('winner').classList.remove('show');
+  $('roomPanel').classList.remove('show');
+  $('intro').classList.remove('hide');
+  $('homeStatus').textContent='';
+  $('connection').textContent='OFFLINE';
+}
+function generateCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<6;i++)out+=chars[Math.floor(Math.random()*chars.length)];return out.toLowerCase()}
+function showRoom(){ $('roomPanel').classList.add('show') }
+function fail(msg){$('homeStatus').textContent=msg;$('roomStatus').textContent=msg}
+function createRoom(){
+  clearTimeout(roundTimer);
+  isPassAndPlay=false;
+  if(!window.Peer){fail('PeerJS could not load.');return}
+  target=Number($('targetPoints').value)||3;role='host';
+  document.body.classList.add('host-mode');document.body.classList.remove('guest-mode');
+  $('homeStatus').textContent='Creating room…';let tries=0;
+  function attempt(){
+    roomCode=generateCode();peer=new Peer(roomCode);
+    peer.on('open',id=>{
+      roomCode=id.toUpperCase();$('roomTitle').textContent='Room created!';
+      $('roomDescription').textContent='Share this code with your friend. You will play as RED.';
+      $('roomCodeDisplay').textContent=roomCode;$('roomStatus').textContent='Waiting for the other player…';
+      $('copyCode').style.display='inline-block';$('joinCodeInput').style.display='none';
+      $('connectJoin').style.display='none';$('homeStatus').textContent='Room ready: '+roomCode;
+      showRoom();$('connection').textContent='WAITING';$('intro').classList.add('hide');
+    });
+    peer.on('connection',connection=>{
+      if(conn){connection.close();return}
+      conn=connection;
+      conn.on('open',()=>{
+        conn.send({type:'welcome',target,roomCode});
+        $('roomStatus').textContent='Player connected! Starting game…';
+        $('connection').textContent='CONNECTED';
+        $('matchSub').textContent='ONLINE ROOM · '+roomCode;
+        setTimeout(()=>{
+          $('roomPanel').classList.remove('show');
+          redScore=0; blueScore=0; offset=0; finished=false; matchOver=false; active=true;
+          updateScores(); setStatus('PULL! PULL! PULL!'); sendState();
+        },700);
+      });
+      conn.on('data',d=>{
+        if(!d||!conn)return;
+        if(d.type==='pull') handlePull('blue');
+        else if(d.type==='rematch'){
+          if(matchOver){
+            blueRematch=true; updateRematchUI();
+            if(redRematch&&blueRematch) beginRematch(); else sendState();
+          }
+        }
+      });
+      conn.on('close',()=>{conn=null;$('connection').textContent='DISCONNECTED';setStatus('Other player disconnected.');active=false})
+    });
+    peer.on('error',err=>{if(err.type==='unavailable-id'&&tries++<5){peer.destroy();attempt()}else{fail('Could not create room.');$('connection').textContent='OFFLINE'}});
+  }
+  attempt();
+}
+function joinRoom(){
+  clearTimeout(roundTimer);
+  isPassAndPlay=false;
+  role='guest';document.body.classList.add('guest-mode');document.body.classList.remove('host-mode');
+  $('roomTitle').textContent='Join a room';$('roomDescription').textContent='Enter the six-character code shared by the host.';
+  $('roomCodeDisplay').textContent='';$('roomStatus').textContent='';
+  $('joinCodeInput').style.display='block';$('connectJoin').style.display='inline-block';
+  $('copyCode').style.display='none';showRoom();$('joinCodeInput').focus();
+}
+function connectToRoom(){
+  let code=$('joinCodeInput').value.trim().toUpperCase();
+  if(!/^[A-Z0-9]{6}$/.test(code)){$('roomStatus').textContent='Enter exactly 6 letters or numbers.';return}
+  if(!window.Peer){$('roomStatus').textContent='PeerJS failed to load.';return}
+  role='guest';roomCode=code;$('roomStatus').textContent='Connecting…';
+  peer=new Peer();
+  peer.on('open',()=>{
+    conn=peer.connect(code.toLowerCase(),{reliable:true});
+    conn.on('open',()=>{$('roomStatus').textContent='Connected! Waiting for host…';$('connection').textContent='CONNECTED';$('matchSub').textContent='ONLINE ROOM · '+code});
+    conn.on('data',d=>{
+      if(d.type==='welcome'){
+        target=d.target;updateScores();$('intro').classList.add('hide');$('roomPanel').classList.remove('show');setStatus('CONNECTED — GET READY!');
+      } else if(d.type==='state') applyState(d);
+    });
+    conn.on('close',()=>{$('roomStatus').textContent='Host disconnected.';$('connection').textContent='DISCONNECTED';active=false});
+  });
+  peer.on('error',e=>{$('roomStatus').textContent=e.type==='peer-unavailable'?'Room not found.':'Connection error.'});
+}
+function beginRematch(){redScore=0;blueScore=0;redRematch=false;blueRematch=false;offset=0;finished=false;matchOver=false;active=true;$('winner').classList.remove('show');$('intro').classList.add('hide');setStatus('REMATCH! PULL!');updateScores();updateRematchUI();sendState()}
+function requestRematch(){
+  if(isPassAndPlay){
+    redScore=0; blueScore=0; offset=0; finished=false; matchOver=false; active=true;
+    $('winner').classList.remove('show'); setStatus('REMATCH! PULL!'); updateScores();
+    return;
+  }
+  if(!matchOver)return;
+  if(role==='host'){
+    redRematch=true;updateRematchUI();
+    if(blueRematch)beginRematch();else sendState();
+  }else if(role==='guest'&&conn&&conn.open){
+    blueRematch=true;updateRematchUI();
+    conn.send({type:'rematch'});
+  }
+}
+
+$('passPlayBtn').addEventListener('click',startPassAndPlay);
+$('createRoom').addEventListener('click',createRoom);
+$('joinRoom').addEventListener('click',joinRoom);
+$('connectJoin').addEventListener('click',connectToRoom);
+$('mainMenuBtn').addEventListener('click',returnToMainMenu);
+$('topMenuBtn').addEventListener('click',returnToMainMenu);
+$('joinCodeInput').addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)});
+$('copyCode').addEventListener('click',()=>{navigator.clipboard?.writeText(roomCode).then(()=>$('roomStatus').textContent='Room code copied!')});
+$('closeRoom').addEventListener('click',()=>{
+  $('roomPanel').classList.remove('show');
+  if(!conn){peer?.destroy();peer=null;role=null;$('intro').classList.remove('hide')}
+});
+$('redPull').addEventListener('pointerdown',e=>{e.preventDefault();localPull('red')});
+$('bluePull').addEventListener('pointerdown',e=>{e.preventDefault();localPull('blue')});
+$('reset').addEventListener('click',()=>{
+  clearTimeout(roundTimer);
+  if(isPassAndPlay){
+    offset=0; active=true; finished=false; $('winner').classList.remove('show'); setStatus('Round restarted!');
+  } else if(role==='host'&&conn){
+    if(!matchOver){offset=0;active=true;finished=false;$('winner').classList.remove('show');setStatus('Round restarted!');sendState()}
+  }
+});
+$('again').addEventListener('click',()=>{
+  clearTimeout(roundTimer);
+  if(matchOver) requestRematch();
+  else if(isPassAndPlay || (role==='host'&&!matchOver)){
+    $('winner').classList.remove('show'); offset=0; finished=false; active=true; setStatus('NEXT POINT — PULL!'); sendState();
+  }
+});
+window.addEventListener('keydown',e=>{if(e.repeat)return;if(e.key.toLowerCase()==='a')localPull('red');if(e.key.toLowerCase()==='l')localPull('blue')});
+
+const originalRender=()=>{
+  if((isPassAndPlay || role==='host') && active && !finished){
+    offset*=.998;if(Math.abs(offset)<.12)offset=0;
+  }
+  draw();
+  raf=requestAnimationFrame(originalRender);
+};
+updateScores();draw();originalRender();
+})();
+</script>
+</body>
+</html>
